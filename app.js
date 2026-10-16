@@ -149,6 +149,7 @@ async function addPhotos(fileList) {
       type: file.type,
       size: file.size,
       dataUrl,
+      file,
       persistable: file.size <= MAX_LOCAL_PHOTO_BYTES,
     });
   }
@@ -330,9 +331,17 @@ async function publishProduct() {
   payload.append('groupId', settings.groupId);
   payload.append('product', JSON.stringify(getFormData()));
 
-  // Сохранённые после перезагрузки dataURL не являются File, поэтому
-  // реальная публикация требует заново выбранных файлов или серверного черновика.
-  // На первом этапе серверный endpoint может принимать JSON без фото для тестирования.
+  photos.forEach((photo, index) => {
+    if (photo.file instanceof File) {
+      payload.append('photos', photo.file, photo.name || `product-${index + 1}.jpg`);
+    }
+  });
+
+  const restoredWithoutFiles = photos.some(photo => !(photo.file instanceof File));
+  if (restoredWithoutFiles) {
+    showToast('Часть фото восстановлена из черновика. Для публикации выберите эти файлы заново.', 'error');
+    return;
+  }
 
   const publishButton = form.querySelector('[type="submit"]');
   const originalText = publishButton.textContent;
