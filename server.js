@@ -54,35 +54,33 @@ async function vkCall(method, params = {}) {
   if (data.error) {
     const error = new Error(data.error.error_msg || `VK API error ${data.error.error_code}`);
     error.vk = data.error;
+    error.vkMethod = method;
     throw error;
   }
   return data.response;
 }
 
-async function uploadMarketPhoto(file, isMain) {
-  const uploadServer = await vkCall('photos.getMarketUploadServer', {
+async function uploadMarketPhoto(file) {
+  const uploadServer = await vkCall('market.getProductPhotoUploadServer', {
     group_id: VK_GROUP_ID,
-    main_photo: isMain ? 1 : 0,
   });
 
+  if (!uploadServer?.upload_url) throw new Error('VK не вернул адрес сервера для загрузки фотографии');
+
   const form = new FormData();
-  form.append('photo', new Blob([file.buffer], { type: file.mimetype }), file.originalname || 'photo.jpg');
+  form.append('file', new Blob([file.buffer], { type: file.mimetype }), file.originalname || 'photo.jpg');
 
   const uploadResponse = await fetch(uploadServer.upload_url, { method: 'POST', body: form });
   const uploaded = await uploadResponse.json();
+  if (!uploadResponse.ok) throw new Error('VK не принял фотографию');
 
-  const saved = await vkCall('photos.saveMarketPhoto', {
-    group_id: VK_GROUP_ID,
-    photo: uploaded.photo,
-    server: uploaded.server,
-    hash: uploaded.hash,
-    crop_data: uploaded.crop_data,
-    crop_hash: uploaded.crop_hash,
+  const saved = await vkCall('market.saveProductPhoto', {
+    upload_response: JSON.stringify(uploaded),
   });
 
-  const photo = Array.isArray(saved) ? saved[0] : saved;
-  if (!photo?.id) throw new Error('VK не вернул ID фотографии');
-  return photo.id;
+  const photoId = Number(saved?.photo_id || saved?.photo?.id);
+  if (!Number.isSafeInteger(photoId) || photoId <= 0) throw new Error('VK не вернул ID фотографии');
+  return photoId;
 }
 
 function flattenCategories(items, parent = '', result = []) {
@@ -149,8 +147,8 @@ app.post('/api/products', upload.array('photos', 5), async (req, res, next) => {
     if (!req.files?.length) throw new Error('Добавьте хотя бы одну фотографию');
 
     const photoIds = [];
-    for (let i = 0; i < req.files.length; i += 1) {
-      photoIds.push(await uploadMarketPhoto(req.files[i], i === 0));
+    for (const file of req.files) {
+      photoIds.push(await uploadMarketPhoto(file));
     }
 
     const [mainPhotoId, ...additionalPhotoIds] = photoIds;
@@ -191,9 +189,19 @@ app.post('/api/products', upload.array('photos', 5), async (req, res, next) => {
 
 app.use((error, _req, res, _next) => {
   console.error(error);
-  res.status(error instanceof multer.MulterError ? 400 : 500).json({
+
+  if (error.vk?.error_code === 27) {
+    return res.status(400).json({
+      error: 'В VK_ACCESS_TOKEN сейчас используется токен сообщества. Для работы с товарами VK нужен пользовательский access token администратора сообщества.',
+      vkErrorCode: 27,
+      vkMethod: error.vkMethod,
+    });
+  }
+
+  return res.status(error instanceof multer.MulterError ? 400 : 500).json({
     error: error.message || 'Ошибка сервера',
     vkErrorCode: error.vk?.error_code,
+    vkMethod: error.vkMethod,
   });
 });
 
