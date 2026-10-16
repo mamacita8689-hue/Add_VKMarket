@@ -20,7 +20,7 @@
         <div class="topbar__subtitle">Город Фантазий 57</div>
       </div>
     </div>
-    <button class="button button--ghost" id="settingsButton" type="button">⚙ Настройки</button>
+    <button class="button button--ghost" id="settingsButton" type="button">⚙ Подключение</button>
   </header>
 
   <main class="layout">
@@ -28,21 +28,14 @@
       <div class="section-heading">
         <div>
           <h1>Новый товар</h1>
-          <p>Заполните карточку, проверьте предпросмотр и сохраните черновик.</p>
+          <p>Заполните карточку, проверьте предпросмотр и опубликуйте товар.</p>
         </div>
-        <span class="status-badge" id="draftStatus">Новый черновик</span>
+        <span class="status-badge" id="draftStatus">Подключение к VK…</span>
       </div>
 
       <form id="productForm" novalidate>
         <section class="card">
-          <div class="card__heading">
-            <div>
-              <span class="step">1</span>
-              <h2>Фотографии</h2>
-            </div>
-            <span class="muted">до 5 фото</span>
-          </div>
-
+          <div class="card__heading"><div><span class="step">1</span><h2>Фотографии</h2></div><span class="muted">до 5 фото</span></div>
           <label class="dropzone" id="dropzone" for="photoInput">
             <input id="photoInput" type="file" accept="image/*" multiple hidden />
             <div class="dropzone__icon">＋</div>
@@ -54,87 +47,39 @@
         </section>
 
         <section class="card">
-          <div class="card__heading">
-            <div>
-              <span class="step">2</span>
-              <h2>Основная информация</h2>
-            </div>
-          </div>
-
+          <div class="card__heading"><div><span class="step">2</span><h2>Основная информация</h2></div></div>
           <div class="field">
             <label for="title">Название товара <span class="required">*</span></label>
             <input id="title" name="title" type="text" maxlength="120" placeholder="Например: Кабошоны «Мишки», 10 шт" required />
             <div class="field__meta"><span id="titleError" class="error"></span><span id="titleCount">0 / 120</span></div>
           </div>
-
           <div class="field">
             <label for="description">Описание <span class="required">*</span></label>
             <textarea id="description" name="description" rows="7" maxlength="4000" placeholder="Расскажите о размере, материале, количестве в наборе и вариантах применения…" required></textarea>
             <div class="field__meta"><span id="descriptionError" class="error"></span><span id="descriptionCount">0 / 4000</span></div>
           </div>
-
           <div class="two-columns">
-            <div class="field">
-              <label for="price">Цена, ₽ <span class="required">*</span></label>
-              <input id="price" name="price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="250" required />
-              <span id="priceError" class="error"></span>
-            </div>
-            <div class="field">
-              <label for="sku">Артикул</label>
-              <input id="sku" name="sku" type="text" maxlength="50" placeholder="KAB-001" />
-            </div>
+            <div class="field"><label for="price">Цена, ₽ <span class="required">*</span></label><input id="price" name="price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="250" required /><span id="priceError" class="error"></span></div>
+            <div class="field"><label for="sku">Артикул</label><input id="sku" name="sku" type="text" maxlength="50" placeholder="KAB-001" /></div>
           </div>
-
           <div class="two-columns">
-            <div class="field">
-              <label for="quantity">Остаток, шт.</label>
-              <input id="quantity" name="quantity" type="number" min="0" step="1" inputmode="numeric" placeholder="10" />
-            </div>
+            <div class="field"><label for="quantity">Остаток, шт.</label><input id="quantity" name="quantity" type="number" min="0" step="1" inputmode="numeric" placeholder="10" /></div>
             <div class="field">
               <label for="productType">Тип товара</label>
               <select id="productType" name="productType">
-                <option value="Кабошоны">Кабошоны</option>
-                <option value="Кожзам">Кожзам</option>
-                <option value="Термотрансферы">Термотрансферы</option>
-                <option value="Вырубка">Вырубка</option>
-                <option value="Шаблоны">Шаблоны</option>
-                <option value="Заготовки">Заготовки</option>
-                <option value="Прочее">Прочее</option>
+                <option value="Кабошоны">Кабошоны</option><option value="Кожзам">Кожзам</option><option value="Термотрансферы">Термотрансферы</option><option value="Вырубка">Вырубка</option><option value="Шаблоны">Шаблоны</option><option value="Заготовки">Заготовки</option><option value="Прочее">Прочее</option>
               </select>
             </div>
           </div>
         </section>
 
         <section class="card">
-          <div class="card__heading">
-            <div>
-              <span class="step">3</span>
-              <h2>Размещение</h2>
-            </div>
-          </div>
-
+          <div class="card__heading"><div><span class="step">3</span><h2>Размещение</h2></div></div>
           <div class="two-columns">
-            <div class="field">
-              <label for="vkCategory">Категория VK</label>
-              <select id="vkCategory" name="vkCategory">
-                <option value="">Будет получена из VK API</option>
-              </select>
-              <small>Позже список будет загружаться автоматически из VK.</small>
-            </div>
-            <div class="field">
-              <label for="album">Подборка</label>
-              <select id="album" name="album">
-                <option value="">Без подборки</option>
-              </select>
-              <small>Подборки сообщества подключим через API.</small>
-            </div>
+            <div class="field"><label for="vkCategory">Категория VK</label><select id="vkCategory" name="vkCategory"><option value="">Подключаем VK…</option></select><small>Категории загружаются автоматически из VK.</small></div>
+            <div class="field"><label for="album">Подборка</label><select id="album" name="album"><option value="">Без подборки</option></select><small>Подборки загружаются из вашего сообщества.</small></div>
           </div>
-
-          <label class="switch-row">
-            <input id="active" name="active" type="checkbox" checked />
-            <span class="switch" aria-hidden="true"></span>
-            <span><strong>Товар активен</strong><small>После публикации карточка будет доступна покупателям.</small></span>
-          </label>
+          <label class="switch-row"><input id="active" name="active" type="checkbox" checked /><span class="switch" aria-hidden="true"></span><span><strong>Товар активен</strong><small>После публикации карточка будет доступна покупателям.</small></span></label>
         </section>
 
         <div class="actions">
@@ -149,55 +94,29 @@
       <div class="preview-column__sticky">
         <div class="preview-title">Предпросмотр</div>
         <article class="vk-card">
-          <div class="vk-card__image-wrap" id="previewImageWrap">
-            <div class="vk-card__placeholder">Фото товара</div>
-            <img id="previewImage" alt="Предпросмотр товара" hidden />
-          </div>
+          <div class="vk-card__image-wrap"><div class="vk-card__placeholder">Фото товара</div><img id="previewImage" alt="Предпросмотр товара" hidden /></div>
           <div class="vk-card__content">
-            <h3 id="previewTitle">Название товара</h3>
-            <div class="vk-card__price" id="previewPrice">0 ₽</div>
-            <p id="previewDescription">Здесь появится краткое описание товара.</p>
-            <div class="vk-card__meta">
-              <span id="previewType">Кабошоны</span>
-              <span id="previewStock">Остаток не указан</span>
-            </div>
+            <h3 id="previewTitle">Название товара</h3><div class="vk-card__price" id="previewPrice">0 ₽</div><p id="previewDescription">Здесь появится краткое описание товара.</p>
+            <div class="vk-card__meta"><span id="previewType">Кабошоны</span><span id="previewStock">Остаток не указан</span></div>
             <button type="button" class="vk-card__button">Написать продавцу</button>
           </div>
         </article>
-        <div class="hint">
-          <strong>Первый этап</strong>
-          <span>Форма уже умеет сохранять черновики в браузере. Следующий шаг — подключить безопасную серверную авторизацию и реальную публикацию через VK API.</span>
-        </div>
+        <div class="hint"><strong>Безопасная авторизация</strong><span>Токен не хранится в коде или Codespaces. При запуске внутри VK приложение запрашивает доступ к товарам от вашего аккаунта администратора.</span></div>
       </div>
     </aside>
   </main>
 
   <dialog id="settingsDialog" class="dialog">
-    <form method="dialog" class="dialog__body" id="settingsForm">
-      <div class="dialog__heading">
-        <div>
-          <h2>Настройки подключения</h2>
-          <p>Токен VK сюда не вводится — он должен храниться только на сервере.</p>
-        </div>
-        <button class="icon-button" value="cancel" aria-label="Закрыть">×</button>
-      </div>
-      <div class="field">
-        <label for="groupId">ID сообщества VK</label>
-        <input id="groupId" type="text" inputmode="numeric" placeholder="Например: 123456789" />
-      </div>
-      <div class="field">
-        <label for="apiUrl">Адрес серверного API</label>
-        <input id="apiUrl" type="url" placeholder="https://api.example.ru" />
-        <small>Пока можно оставить пустым. Публикацию подключим на следующем этапе.</small>
-      </div>
-      <div class="dialog__actions">
-        <button class="button button--secondary" value="cancel">Отмена</button>
-        <button class="button button--primary" id="saveSettingsButton" value="default">Сохранить</button>
-      </div>
+    <form method="dialog" class="dialog__body">
+      <div class="dialog__heading"><div><h2>Подключение VK</h2><p id="connectionText">Проверяем подключение…</p></div><button class="icon-button" value="cancel" aria-label="Закрыть">×</button></div>
+      <div class="field"><label for="groupId">ID сообщества VK</label><input id="groupId" type="text" disabled /></div>
+      <div class="field"><label for="apiUrl">Адрес приложения</label><input id="apiUrl" type="url" disabled /><small>Пользовательский токен существует только в памяти текущей вкладки и не сохраняется.</small></div>
+      <div class="dialog__actions"><button class="button button--primary" id="saveSettingsButton" value="default">Закрыть</button></div>
     </form>
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
