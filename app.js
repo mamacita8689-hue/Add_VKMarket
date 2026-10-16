@@ -15,34 +15,30 @@ const draftStatus = document.querySelector('#draftStatus');
 const saveDraftButton = document.querySelector('#saveDraftButton');
 const clearButton = document.querySelector('#clearButton');
 const toast = document.querySelector('#toast');
-
 const previewImage = document.querySelector('#previewImage');
 const previewTitle = document.querySelector('#previewTitle');
 const previewPrice = document.querySelector('#previewPrice');
 const previewDescription = document.querySelector('#previewDescription');
 const previewType = document.querySelector('#previewType');
 const previewStock = document.querySelector('#previewStock');
-
 const settingsDialog = document.querySelector('#settingsDialog');
 const settingsButton = document.querySelector('#settingsButton');
-const saveSettingsButton = document.querySelector('#saveSettingsButton');
 const groupIdInput = document.querySelector('#groupId');
 const apiUrlInput = document.querySelector('#apiUrl');
+const saveSettingsButton = document.querySelector('#saveSettingsButton');
 
-const DRAFT_KEY = 'vk-market-product-draft-v1';
-const SETTINGS_KEY = 'vk-market-settings-v1';
+const DRAFT_KEY = 'vk-market-product-draft-v2';
 const MAX_PHOTOS = 5;
-const MAX_LOCAL_PHOTO_BYTES = 2_000_000;
-
 let photos = [];
 let toastTimer;
+let serverConfigured = false;
 
 function showToast(message, type = 'normal') {
   clearTimeout(toastTimer);
   toast.textContent = message;
   toast.classList.toggle('is-error', type === 'error');
   toast.classList.add('is-visible');
-  toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2800);
+  toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 3200);
 }
 
 function formatPrice(value) {
@@ -51,65 +47,50 @@ function formatPrice(value) {
   return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(price)} ₽`;
 }
 
-function updateCounters() {
-  document.querySelector('#titleCount').textContent = `${titleInput.value.length} / 120`;
-  document.querySelector('#descriptionCount').textContent = `${descriptionInput.value.length} / 4000`;
-}
-
 function updatePreview() {
   previewTitle.textContent = titleInput.value.trim() || 'Название товара';
   previewPrice.textContent = formatPrice(priceInput.value);
   previewDescription.textContent = descriptionInput.value.trim() || 'Здесь появится краткое описание товара.';
   previewType.textContent = productTypeInput.value || 'Товар';
-
-  const quantity = quantityInput.value.trim();
-  previewStock.textContent = quantity === '' ? 'Остаток не указан' : `В наличии: ${quantity} шт.`;
+  previewStock.textContent = quantityInput.value === '' ? 'Остаток не указан' : `В наличии: ${quantityInput.value} шт.`;
+  document.querySelector('#titleCount').textContent = `${titleInput.value.length} / 120`;
+  document.querySelector('#descriptionCount').textContent = `${descriptionInput.value.length} / 4000`;
 
   if (photos[0]?.dataUrl) {
     previewImage.src = photos[0].dataUrl;
     previewImage.hidden = false;
     document.querySelector('.vk-card__placeholder').hidden = true;
   } else {
-    previewImage.removeAttribute('src');
     previewImage.hidden = true;
     document.querySelector('.vk-card__placeholder').hidden = false;
   }
-
-  updateCounters();
 }
 
 function renderPhotos() {
   photoGrid.replaceChildren();
-
   photos.forEach((photo, index) => {
     const item = document.createElement('div');
     item.className = 'photo-item';
-
     const image = document.createElement('img');
     image.src = photo.dataUrl;
     image.alt = `Фото товара ${index + 1}`;
-
-    const removeButton = document.createElement('button');
-    removeButton.type = 'button';
-    removeButton.className = 'photo-item__remove';
-    removeButton.setAttribute('aria-label', `Удалить фото ${index + 1}`);
-    removeButton.textContent = '×';
-    removeButton.addEventListener('click', () => {
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'photo-item__remove';
+    remove.textContent = '×';
+    remove.addEventListener('click', () => {
       photos.splice(index, 1);
       renderPhotos();
       updatePreview();
       markChanged();
     });
-
-    item.append(image, removeButton);
-
+    item.append(image, remove);
     if (index === 0) {
       const badge = document.createElement('span');
       badge.className = 'photo-item__main';
       badge.textContent = 'Главное';
       item.append(badge);
     }
-
     photoGrid.append(item);
   });
 }
@@ -126,34 +107,15 @@ function fileToDataUrl(file) {
 async function addPhotos(fileList) {
   const candidates = Array.from(fileList).filter(file => file.type.startsWith('image/'));
   const remaining = MAX_PHOTOS - photos.length;
+  if (remaining <= 0) return showToast('Можно добавить не больше 5 фотографий', 'error');
 
-  if (remaining <= 0) {
-    showToast(`Можно добавить не больше ${MAX_PHOTOS} фотографий`, 'error');
-    return;
-  }
-
-  const selected = candidates.slice(0, remaining);
-  if (candidates.length > remaining) {
-    showToast(`Добавлены первые ${remaining} фото. Лимит — ${MAX_PHOTOS}.`);
-  }
-
-  for (const file of selected) {
+  for (const file of candidates.slice(0, remaining)) {
     if (file.size > 12_000_000) {
-      showToast(`Файл «${file.name}» слишком большой`, 'error');
+      showToast(`Файл «${file.name}» больше 12 МБ`, 'error');
       continue;
     }
-
-    const dataUrl = await fileToDataUrl(file);
-    photos.push({
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      dataUrl,
-      file,
-      persistable: file.size <= MAX_LOCAL_PHOTO_BYTES,
-    });
+    photos.push({ name: file.name, dataUrl: await fileToDataUrl(file), file });
   }
-
   photoInput.value = '';
   renderPhotos();
   updatePreview();
@@ -161,21 +123,14 @@ async function addPhotos(fileList) {
 }
 
 photoInput.addEventListener('change', event => addPhotos(event.target.files));
-
-['dragenter', 'dragover'].forEach(type => {
-  dropzone.addEventListener(type, event => {
-    event.preventDefault();
-    dropzone.classList.add('is-dragging');
-  });
-});
-
-['dragleave', 'drop'].forEach(type => {
-  dropzone.addEventListener(type, event => {
-    event.preventDefault();
-    dropzone.classList.remove('is-dragging');
-  });
-});
-
+['dragenter', 'dragover'].forEach(type => dropzone.addEventListener(type, event => {
+  event.preventDefault();
+  dropzone.classList.add('is-dragging');
+}));
+['dragleave', 'drop'].forEach(type => dropzone.addEventListener(type, event => {
+  event.preventDefault();
+  dropzone.classList.remove('is-dragging');
+}));
 dropzone.addEventListener('drop', event => addPhotos(event.dataTransfer.files));
 
 function getFormData() {
@@ -199,8 +154,8 @@ function setFormData(data = {}) {
   skuInput.value = data.sku ?? '';
   quantityInput.value = data.quantity ?? '';
   productTypeInput.value = data.productType ?? 'Кабошоны';
-  vkCategoryInput.value = data.vkCategory ?? '';
-  albumInput.value = data.album ?? '';
+  if (data.vkCategory != null) vkCategoryInput.dataset.savedValue = data.vkCategory;
+  if (data.album != null) albumInput.dataset.savedValue = data.album;
   activeInput.checked = data.active ?? true;
   updatePreview();
 }
@@ -210,25 +165,9 @@ function markChanged() {
 }
 
 function saveDraft() {
-  const draftPhotos = photos
-    .filter(photo => photo.persistable)
-    .map(({ name, type, size, dataUrl, persistable }) => ({ name, type, size, dataUrl, persistable }));
-
-  try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({
-      data: getFormData(),
-      photos: draftPhotos,
-      savedAt: new Date().toISOString(),
-    }));
-    draftStatus.textContent = 'Черновик сохранён';
-    showToast(photos.some(photo => !photo.persistable)
-      ? 'Черновик сохранён. Крупные фото нужно будет выбрать заново.'
-      : 'Черновик сохранён');
-  } catch {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ data: getFormData(), photos: [], savedAt: new Date().toISOString() }));
-    draftStatus.textContent = 'Черновик сохранён без фото';
-    showToast('Текст сохранён. Фото слишком большие для хранения в браузере.');
-  }
+  localStorage.setItem(DRAFT_KEY, JSON.stringify({ data: getFormData(), savedAt: new Date().toISOString() }));
+  draftStatus.textContent = 'Черновик сохранён';
+  showToast('Черновик сохранён. Фото после перезагрузки нужно выбрать заново.');
 }
 
 function loadDraft() {
@@ -236,28 +175,14 @@ function loadDraft() {
     const saved = JSON.parse(localStorage.getItem(DRAFT_KEY));
     if (!saved) return;
     setFormData(saved.data);
-    photos = Array.isArray(saved.photos) ? saved.photos : [];
-    renderPhotos();
-    updatePreview();
     draftStatus.textContent = 'Черновик восстановлен';
   } catch {
     localStorage.removeItem(DRAFT_KEY);
   }
 }
 
-function clearForm() {
-  form.reset();
-  photos = [];
-  localStorage.removeItem(DRAFT_KEY);
-  renderPhotos();
-  setFormData({});
-  clearValidation();
-  draftStatus.textContent = 'Новый черновик';
-  showToast('Форма очищена');
-}
-
 function clearValidation() {
-  [titleInput, descriptionInput, priceInput].forEach(input => input.classList.remove('is-invalid'));
+  [titleInput, descriptionInput, priceInput, vkCategoryInput].forEach(input => input.classList.remove('is-invalid'));
   document.querySelector('#titleError').textContent = '';
   document.querySelector('#descriptionError').textContent = '';
   document.querySelector('#priceError').textContent = '';
@@ -266,136 +191,113 @@ function clearValidation() {
 function validateForm() {
   clearValidation();
   let valid = true;
-
-  if (!titleInput.value.trim()) {
-    titleInput.classList.add('is-invalid');
-    document.querySelector('#titleError').textContent = 'Укажите название';
-    valid = false;
-  }
-
-  if (!descriptionInput.value.trim()) {
-    descriptionInput.classList.add('is-invalid');
-    document.querySelector('#descriptionError').textContent = 'Добавьте описание';
-    valid = false;
-  }
-
-  if (!priceInput.value || Number(priceInput.value) <= 0) {
-    priceInput.classList.add('is-invalid');
-    document.querySelector('#priceError').textContent = 'Укажите цену больше 0';
-    valid = false;
-  }
-
-  if (!valid) {
-    document.querySelector('.is-invalid')?.focus();
-    showToast('Проверьте обязательные поля', 'error');
-  }
-
+  if (!titleInput.value.trim()) { titleInput.classList.add('is-invalid'); document.querySelector('#titleError').textContent = 'Укажите название'; valid = false; }
+  if (!descriptionInput.value.trim()) { descriptionInput.classList.add('is-invalid'); document.querySelector('#descriptionError').textContent = 'Добавьте описание'; valid = false; }
+  if (!priceInput.value || Number(priceInput.value) <= 0) { priceInput.classList.add('is-invalid'); document.querySelector('#priceError').textContent = 'Укажите цену больше 0'; valid = false; }
+  if (!vkCategoryInput.value) { vkCategoryInput.classList.add('is-invalid'); valid = false; }
+  if (!photos.length) { showToast('Добавьте хотя бы одну фотографию', 'error'); valid = false; }
+  if (!valid) document.querySelector('.is-invalid')?.focus();
   return valid;
 }
 
-function getSettings() {
+async function apiGet(path) {
+  const response = await fetch(path);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `Ошибка ${response.status}`);
+  return data;
+}
+
+async function loadVkData() {
   try {
-    return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
-  } catch {
-    return {};
+    const health = await apiGet('/api/health');
+    serverConfigured = Boolean(health.configured);
+    groupIdInput.value = health.groupId || '';
+    apiUrlInput.value = window.location.origin;
+    groupIdInput.disabled = true;
+    apiUrlInput.disabled = true;
+
+    if (!serverConfigured) {
+      draftStatus.textContent = 'VK не подключён';
+      return;
+    }
+
+    const [categories, albums] = await Promise.all([apiGet('/api/categories'), apiGet('/api/albums')]);
+    vkCategoryInput.innerHTML = '<option value="">Выберите категорию VK</option>';
+    for (const item of categories.items || []) {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = item.name || item.title || `Категория ${item.id}`;
+      vkCategoryInput.append(option);
+    }
+
+    albumInput.innerHTML = '<option value="">Без подборки</option>';
+    for (const item of albums.items || []) {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = item.title || `Подборка ${item.id}`;
+      albumInput.append(option);
+    }
+
+    if (vkCategoryInput.dataset.savedValue) vkCategoryInput.value = vkCategoryInput.dataset.savedValue;
+    if (albumInput.dataset.savedValue) albumInput.value = albumInput.dataset.savedValue;
+  } catch (error) {
+    serverConfigured = false;
+    showToast(`Не удалось получить данные VK: ${error.message}`, 'error');
   }
-}
-
-function saveSettings() {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-    groupId: groupIdInput.value.trim(),
-    apiUrl: apiUrlInput.value.trim().replace(/\/$/, ''),
-  }));
-  showToast('Настройки сохранены');
-}
-
-function openSettings() {
-  const settings = getSettings();
-  groupIdInput.value = settings.groupId || '';
-  apiUrlInput.value = settings.apiUrl || '';
-  settingsDialog.showModal();
 }
 
 async function publishProduct() {
-  if (!validateForm()) return;
-
-  const settings = getSettings();
-  if (!settings.apiUrl || !settings.groupId) {
-    saveDraft();
-    showToast('Сначала укажите сообщество и подключите серверный API', 'error');
-    openSettings();
+  if (!serverConfigured) {
+    showToast('Сначала настройте VK_GROUP_ID и VK_ACCESS_TOKEN на сервере', 'error');
+    settingsDialog.showModal();
     return;
   }
+  if (!validateForm()) return showToast('Проверьте обязательные поля', 'error');
 
   const payload = new FormData();
-  payload.append('groupId', settings.groupId);
   payload.append('product', JSON.stringify(getFormData()));
+  photos.forEach((photo, index) => payload.append('photos', photo.file, photo.name || `product-${index + 1}.jpg`));
 
-  photos.forEach((photo, index) => {
-    if (photo.file instanceof File) {
-      payload.append('photos', photo.file, photo.name || `product-${index + 1}.jpg`);
-    }
-  });
-
-  const restoredWithoutFiles = photos.some(photo => !(photo.file instanceof File));
-  if (restoredWithoutFiles) {
-    showToast('Часть фото восстановлена из черновика. Для публикации выберите эти файлы заново.', 'error');
-    return;
-  }
-
-  const publishButton = form.querySelector('[type="submit"]');
-  const originalText = publishButton.textContent;
-  publishButton.disabled = true;
-  publishButton.textContent = 'Публикация…';
+  const button = form.querySelector('[type="submit"]');
+  button.disabled = true;
+  button.textContent = 'Публикация…';
 
   try {
-    const response = await fetch(`${settings.apiUrl}/api/products`, {
-      method: 'POST',
-      body: payload,
-    });
-
+    const response = await fetch('/api/products', { method: 'POST', body: payload });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || `Ошибка ${response.status}`);
-
     localStorage.removeItem(DRAFT_KEY);
-    draftStatus.textContent = 'Опубликовано';
-    showToast('Товар успешно отправлен в VK');
+    draftStatus.textContent = `Опубликовано · товар ${result.itemId}`;
+    showToast('Товар успешно опубликован в VK');
+    if (result.url && confirm('Товар опубликован. Открыть его во ВКонтакте?')) window.open(result.url, '_blank', 'noopener');
   } catch (error) {
     saveDraft();
     showToast(`Не удалось опубликовать: ${error.message}`, 'error');
   } finally {
-    publishButton.disabled = false;
-    publishButton.textContent = originalText;
+    button.disabled = false;
+    button.textContent = 'Опубликовать в VK';
   }
 }
 
-form.addEventListener('submit', event => {
-  event.preventDefault();
-  publishProduct();
-});
-
+form.addEventListener('submit', event => { event.preventDefault(); publishProduct(); });
 saveDraftButton.addEventListener('click', saveDraft);
 clearButton.addEventListener('click', () => {
-  if (confirm('Очистить форму и удалить сохранённый черновик?')) clearForm();
+  if (!confirm('Очистить форму и удалить черновик?')) return;
+  form.reset();
+  photos = [];
+  localStorage.removeItem(DRAFT_KEY);
+  renderPhotos();
+  setFormData({});
+  draftStatus.textContent = 'Новый черновик';
 });
-settingsButton.addEventListener('click', openSettings);
-saveSettingsButton.addEventListener('click', event => {
-  event.preventDefault();
-  saveSettings();
-  settingsDialog.close();
-});
+settingsButton.addEventListener('click', () => settingsDialog.showModal());
+saveSettingsButton.addEventListener('click', event => { event.preventDefault(); settingsDialog.close(); });
 
-[titleInput, descriptionInput, priceInput, skuInput, quantityInput, productTypeInput, vkCategoryInput, albumInput, activeInput]
-  .forEach(input => {
-    input.addEventListener('input', () => {
-      updatePreview();
-      markChanged();
-    });
-    input.addEventListener('change', () => {
-      updatePreview();
-      markChanged();
-    });
-  });
+[titleInput, descriptionInput, priceInput, skuInput, quantityInput, productTypeInput, vkCategoryInput, albumInput, activeInput].forEach(input => {
+  input.addEventListener('input', () => { updatePreview(); markChanged(); });
+  input.addEventListener('change', () => { updatePreview(); markChanged(); });
+});
 
 loadDraft();
 updatePreview();
+loadVkData();
