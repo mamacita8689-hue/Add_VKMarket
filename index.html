@@ -101,7 +101,7 @@
             <button type="button" class="vk-card__button">Написать продавцу</button>
           </div>
         </article>
-        <div class="hint"><strong>Безопасная авторизация</strong><span>Токен не хранится в коде или Codespaces. При запуске внутри VK приложение запрашивает доступ к товарам от вашего аккаунта администратора.</span></div>
+        <div class="hint"><strong>Серверное приложение</strong><span>Форма работает на нашем сервере. Пользовательский VK-токен хранится только в секретах сервера и не передаётся в браузер.</span></div>
       </div>
     </aside>
   </main>
@@ -110,14 +110,12 @@
     <form method="dialog" class="dialog__body">
       <div class="dialog__heading"><div><h2>Подключение VK</h2><p id="connectionText">Проверяем подключение…</p></div><button class="icon-button" value="cancel" aria-label="Закрыть">×</button></div>
       <div class="field"><label for="groupId">ID сообщества VK</label><input id="groupId" type="text" disabled /></div>
-      <div class="field"><label for="apiUrl">Адрес приложения</label><input id="apiUrl" type="url" disabled /><small>Пользовательский токен существует только в памяти текущей вкладки и не сохраняется.</small></div>
+      <div class="field"><label for="apiUrl">Адрес приложения</label><input id="apiUrl" type="url" disabled /><small>VK_ACCESS_TOKEN хранится только в Codespaces Secret или на VPS.</small></div>
       <div class="dialog__actions"><button class="button button--primary" id="saveSettingsButton" value="default">Закрыть</button></div>
     </form>
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
-  <script src="miniapp-auth.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
