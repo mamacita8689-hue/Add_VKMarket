@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const VK_API_VERSION = process.env.VK_API_VERSION || '5.199';
+const VK_ACCESS_TOKEN = process.env.VK_ACCESS_TOKEN || '';
 const VK_GROUP_ID = Number(String(process.env.VK_GROUP_ID || '').replace(/^-/, ''));
 
 const upload = multer({
@@ -22,11 +23,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(__dirname));
 
 function ensureConfigured() {
-  if (!Number.isSafeInteger(VK_GROUP_ID) || VK_GROUP_ID <= 0) {
-    const error = new Error('На сервере не задан корректный VK_GROUP_ID');
-    error.status = 500;
-    throw error;
-  }
+  if (!VK_ACCESS_TOKEN) throw new Error('На сервере не задан VK_ACCESS_TOKEN');
+  if (!Number.isSafeInteger(VK_GROUP_ID) || VK_GROUP_ID <= 0) throw new Error('На сервере не задан корректный VK_GROUP_ID');
 }
 
 function ownerId() {
@@ -34,36 +32,23 @@ function ownerId() {
   return -VK_GROUP_ID;
 }
 
-function getUserToken(req) {
-  const header = String(req.headers.authorization || '');
-  const match = header.match(/^Bearer\s+(.+)$/i);
-  if (!match?.[1]) {
-    const error = new Error('Нужно открыть приложение через VK и разрешить доступ к товарам');
-    error.status = 401;
-    throw error;
-  }
-  return match[1];
-}
-
-function apiBody(accessToken, params = {}) {
+function apiBody(params = {}) {
   const body = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === null || value === '') return;
     body.set(key, Array.isArray(value) ? value.join(',') : String(value));
   });
-  body.set('access_token', accessToken);
+  body.set('access_token', VK_ACCESS_TOKEN);
   body.set('v', VK_API_VERSION);
   return body;
 }
 
-async function vkCall(method, params, accessToken) {
+async function vkCall(method, params = {}) {
   ensureConfigured();
-  if (!accessToken) throw new Error('Не получен пользовательский токен VK');
-
   const response = await fetch(`https://api.vk.com/method/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: apiBody(accessToken, params),
+    body: apiBody(params),
   });
   const data = await response.json();
   if (data.error) {
@@ -75,10 +60,10 @@ async function vkCall(method, params, accessToken) {
   return data.response;
 }
 
-async function uploadMarketPhoto(file, accessToken) {
+async function uploadMarketPhoto(file) {
   const uploadServer = await vkCall('market.getProductPhotoUploadServer', {
     group_id: VK_GROUP_ID,
-  }, accessToken);
+  });
 
   if (!uploadServer?.upload_url) throw new Error('VK не вернул адрес сервера для загрузки фотографии');
 
@@ -91,7 +76,7 @@ async function uploadMarketPhoto(file, accessToken) {
 
   const saved = await vkCall('market.saveProductPhoto', {
     upload_response: JSON.stringify(uploaded),
-  }, accessToken);
+  });
 
   const photoId = Number(saved?.photo_id || saved?.photo?.id);
   if (!Number.isSafeInteger(photoId) || photoId <= 0) throw new Error('VK не вернул ID фотографии');
@@ -115,17 +100,16 @@ function flattenCategories(items, parent = '', result = []) {
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
-    configured: Number.isSafeInteger(VK_GROUP_ID) && VK_GROUP_ID > 0,
+    configured: Boolean(VK_ACCESS_TOKEN && Number.isSafeInteger(VK_GROUP_ID) && VK_GROUP_ID > 0),
     groupId: Number.isSafeInteger(VK_GROUP_ID) && VK_GROUP_ID > 0 ? VK_GROUP_ID : null,
     apiVersion: VK_API_VERSION,
-    authMode: 'vk-mini-app-user-token',
+    authMode: 'server-user-token',
   });
 });
 
-app.get('/api/categories', async (req, res, next) => {
+app.get('/api/categories', async (_req, res, next) => {
   try {
-    const token = getUserToken(req);
-    const response = await vkCall('market.getCategories', { group_id: VK_GROUP_ID }, token);
+    const response = await vkCall('market.getCategories', { group_id: VK_GROUP_ID });
     const raw = response?.items || [];
     const flat = flattenCategories(raw);
     res.json({ items: flat.length ? flat : raw });
@@ -134,10 +118,9 @@ app.get('/api/categories', async (req, res, next) => {
   }
 });
 
-app.get('/api/albums', async (req, res, next) => {
+app.get('/api/albums', async (_req, res, next) => {
   try {
-    const token = getUserToken(req);
-    const response = await vkCall('market.getAlbums', { owner_id: ownerId(), count: 100 }, token);
+    const response = await vkCall('market.getAlbums', { owner_id: ownerId(), count: 100 });
     res.json({
       items: (response?.items || []).map(item => ({
         id: item.id,
@@ -151,7 +134,6 @@ app.get('/api/albums', async (req, res, next) => {
 
 app.post('/api/products', upload.array('photos', 5), async (req, res, next) => {
   try {
-    const token = getUserToken(req);
     const product = JSON.parse(req.body.product || '{}');
     const name = String(product.title || '').trim();
     const description = String(product.description || '').trim();
@@ -166,7 +148,7 @@ app.post('/api/products', upload.array('photos', 5), async (req, res, next) => {
     if (!req.files?.length) throw new Error('Добавьте хотя бы одну фотографию');
 
     const photoIds = [];
-    for (const file of req.files) photoIds.push(await uploadMarketPhoto(file, token));
+    for (const file of req.files) photoIds.push(await uploadMarketPhoto(file));
 
     const [mainPhotoId, ...additionalPhotoIds] = photoIds;
     const created = await vkCall('market.add', {
@@ -180,7 +162,7 @@ app.post('/api/products', upload.array('photos', 5), async (req, res, next) => {
       photo_ids: additionalPhotoIds,
       sku: String(product.sku || '').trim() || undefined,
       stock_amount: Number.isSafeInteger(quantity) && quantity >= 0 ? quantity : undefined,
-    }, token);
+    });
 
     const itemId = created?.market_item_id;
     if (!itemId) throw new Error('VK не вернул ID созданного товара');
@@ -191,7 +173,7 @@ app.post('/api/products', upload.array('photos', 5), async (req, res, next) => {
         owner_id: ownerId(),
         item_ids: [itemId],
         album_ids: [albumId],
-      }, token);
+      });
     }
 
     res.status(201).json({
@@ -206,19 +188,18 @@ app.post('/api/products', upload.array('photos', 5), async (req, res, next) => {
 
 app.use((error, _req, res, _next) => {
   console.error(error);
-
   let message = error.message || 'Ошибка сервера';
-  let status = error.status || (error instanceof multer.MulterError ? 400 : 500);
+  let status = error instanceof multer.MulterError ? 400 : 500;
 
   if (error.vk?.error_code === 5) {
     status = 401;
-    message = 'Авторизация VK истекла. Перезапустите приложение и разрешите доступ ещё раз.';
+    message = 'Пользовательский токен VK недействителен или истёк.';
   } else if (error.vk?.error_code === 7 || error.vk?.error_code === 15) {
     status = 403;
-    message = 'VK не разрешил операцию. Убедитесь, что вы администратор сообщества и дали приложению доступ к товарам.';
+    message = 'VK не разрешил операцию. Проверьте права пользователя-администратора и доступ market.';
   } else if (error.vk?.error_code === 27) {
     status = 400;
-    message = 'Получен неподходящий тип токена VK. Откройте форму как Mini App внутри VK.';
+    message = 'В VK_ACCESS_TOKEN используется токен сообщества. Нужен пользовательский access token администратора сообщества.';
   }
 
   res.status(status).json({
